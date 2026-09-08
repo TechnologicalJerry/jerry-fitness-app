@@ -745,7 +745,11 @@ export class PostgresSearchProvider implements SearchProvider {
       );
     }
 
-    await Promise.all(tasks);
+    try {
+      await Promise.all(tasks);
+    } catch (_err) {
+      // Fallback gracefully on DB disconnection
+    }
 
     return suggestions.slice(0, limit);
   }
