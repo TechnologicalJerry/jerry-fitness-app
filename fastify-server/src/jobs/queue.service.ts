@@ -54,6 +54,26 @@ export class BackgroundQueueService {
           case 'ADHERENCE_AGGREGATION':
             await adherenceService.getAdherence(job.payload.userId, job.payload.windowDays || 7);
             break;
+          case 'SEARCH_ANALYTICS_LOG': {
+            const { searchRepository } = await import('../modules/search/repositories/search.repository');
+            await searchRepository.logAnalytics(job.payload);
+            break;
+          }
+          case 'SEARCH_FULL_REINDEX': {
+            const { searchIndexingService } = await import('../modules/search/indexing/search-indexing.service');
+            await searchIndexingService.executeFullReindex(job.payload?.entityType);
+            break;
+          }
+          case 'MEDIA_PROCESSING': {
+            const { mediaQueueService } = await import('../modules/media/jobs/media-queue.service');
+            await mediaQueueService.processMediaAsset(job.payload.mediaId);
+            break;
+          }
+          case 'MEDIA_CLEANUP': {
+            const { mediaQueueService } = await import('../modules/media/jobs/media-queue.service');
+            await mediaQueueService.runOrphanCleanup();
+            break;
+          }
           default:
             logger.warn({ jobName: job.name }, 'Unknown background job type');
         }
