@@ -18,13 +18,13 @@ export class DailyPlanService {
     const formattedDate = targetDate.toISOString().split('T')[0] || '';
     const cacheKey = `daily-plan:${userId}:${formattedDate}`;
 
-    const cached = await redisService.client.get(cacheKey);
-    if (cached) {
-      try {
+    try {
+      const cached = await redisService.client.get(cacheKey);
+      if (cached) {
         return JSON.parse(cached);
-      } catch (_e) {
-        // Cache fallback
       }
+    } catch (_e) {
+      // Ignore cache get failure if Redis offline
     }
 
     // 1. Fetch user personalization profile
@@ -99,7 +99,11 @@ export class DailyPlanService {
     }).catch(() => {});
 
     // Cache in Redis for 4 hours (14400 seconds)
-    await redisService.client.set(cacheKey, JSON.stringify(planData), 'EX', 14400);
+    try {
+      await redisService.client.set(cacheKey, JSON.stringify(planData), 'EX', 14400);
+    } catch (_e) {
+      // Ignore Redis set failure
+    }
 
     return planData;
   }
