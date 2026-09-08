@@ -6,6 +6,19 @@ import { ErrorCodes } from '../common/constants/error-codes';
 import { HttpStatus } from '../common/constants/http-status';
 
 export default fp(async (fastify: FastifyInstance) => {
+  fastify.setNotFoundHandler((request: FastifyRequest, reply: FastifyReply) => {
+    const requestId = (request.headers['x-request-id'] as string) || 'unknown';
+    return reply
+      .status(HttpStatus.NOT_FOUND)
+      .send(
+        formatErrorResponse(
+          ErrorCodes.NOT_FOUND,
+          `Route ${request.method} ${request.url} not found`,
+          requestId,
+        ),
+      );
+  });
+
   fastify.setErrorHandler((error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) => {
     const requestId = (request.headers['x-request-id'] as string) || 'unknown';
 
