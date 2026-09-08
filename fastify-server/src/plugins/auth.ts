@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import { FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'crypto';
 import { env } from '../config/env';
-import { UnauthorizedError } from '../common/errors/common-errors';
+import { UnauthorizedError, ForbiddenError } from '../common/errors/common-errors';
 
 export function verifyJwtToken(token: string): { sub: string; role: string } {
   const parts = token.split('.');
@@ -53,6 +53,34 @@ export default fp(async (fastify) => {
         id: decoded.sub,
         role: decoded.role,
       };
+    },
+  );
+
+  fastify.decorate(
+    'optionalAuthenticate',
+    async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
+      const authHeader = request.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.substring(7).trim();
+          const decoded = verifyJwtToken(token);
+          request.user = {
+            id: decoded.sub,
+            role: decoded.role,
+          };
+        } catch {
+          // Ignore invalid token in optional authentication
+        }
+      }
+    },
+  );
+
+  fastify.decorate(
+    'requireAdmin',
+    async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
+      if (!request.user || request.user.role !== 'ADMIN') {
+        throw new ForbiddenError('Admin access required');
+      }
     },
   );
 });
