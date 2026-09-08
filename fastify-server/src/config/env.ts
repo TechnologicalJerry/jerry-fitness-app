@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
+import os from 'os';
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -37,6 +38,13 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
     .default('info'),
+
+  S3_ENDPOINT: z.string().default('http://localhost:9000'),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().default('jerry-fitness-media'),
+  S3_ACCESS_KEY_ID: z.string().default('minioadmin'),
+  S3_SECRET_ACCESS_KEY: z.string().default('minioadmin'),
+  CDN_BASE_URL: z.string().default('http://localhost:9000/jerry-fitness-media'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -53,3 +61,4 @@ function parseEnv(): Env {
 }
 
 export const env = parseEnv();
+export const osHostId = os.hostname();
