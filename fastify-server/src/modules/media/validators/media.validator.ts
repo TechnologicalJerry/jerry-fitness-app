@@ -138,6 +138,18 @@ export class MediaValidator {
     return `media/${sanitizedOwner}/${sanitizedMediaId}/${sanitizedVariant}`;
   }
 
+  public generateOrgSecureObjectKey(
+    organizationId: string,
+    mediaId: string,
+    variantName = 'original',
+  ): string {
+    const sanitizedOrg = organizationId.replace(/[^a-zA-Z0-9-]/g, '');
+    const sanitizedMediaId = mediaId.replace(/[^a-zA-Z0-9-]/g, '');
+    const sanitizedVariant = variantName.replace(/[^a-zA-Z0-9-_]/g, '');
+
+    return `organizations/${sanitizedOrg}/media/${sanitizedMediaId}/${sanitizedVariant}`;
+  }
+
   public verifyMagicBytes(buffer: Buffer, declaredMimeType: string): boolean {
     if (!buffer || buffer.length < 4) return true;
 
