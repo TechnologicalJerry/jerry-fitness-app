@@ -130,6 +130,15 @@ model User {
   searchAnalytics         SearchAnalytics[]
   mediaAssets             MediaAsset[]
   storageQuota            UserStorageQuota?
+  analyticsEvents         AnalyticsEvent[]
+  dailyUserMetrics        DailyUserMetric[]
+  analyticsExports        AnalyticsExport[]
+  ownedOrganizations      Organization[]           @relation("OrganizationOwner")
+  organizationMemberships OrganizationMembership[] @relation("UserOrganizationMemberships")
+  invitedMemberships      OrganizationMembership[] @relation("InvitedMemberships")
+  sentInvitations         OrganizationInvitation[] @relation("SentInvitations")
+  teamMemberships         TeamMembership[]
+  auditLogs               AuditLog[]               @relation("AuditLogActor")
 
   @@index([email])
   @@index([status])
@@ -781,4 +790,358 @@ model UserStorageQuota {
   @@index([userId])
   @@map("user_storage_quotas")
 }
+
+model AnalyticsEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String   @unique
+  eventType    String
+  eventVersion String   @default("v1")
+  userId       String?  @db.Uuid
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anonymousId  String?
+  sessionId    String?
+  timestamp    DateTime
+  source       String   @default("client")
+  platform     String   @default("web")
+  appVersion   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([eventType, timestamp])
+  @@index([userId, timestamp])
+  @@index([sessionId, timestamp])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
+
+model DailyUserMetric {
+  id                   String   @id @default(uuid()) @db.Uuid
+  date                 DateTime @db.Date
+  userId               String   @db.Uuid
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active               Boolean  @default(true)
+  workoutsCompleted    Int      @default(0)
+  workoutMinutes       Float    @default(0)
+  mealsLogged          Int      @default(0)
+  hydrationLoggedMl    Float    @default(0)
+  challengesJoined     Int      @default(0)
+  achievementsUnlocked Int      @default(0)
+  searchesPerformed    Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId, date])
+  @@map("daily_user_metrics")
+}
+
+model DailySystemMetric {
+  id                       String   @id @default(uuid()) @db.Uuid
+  date                     DateTime @unique @db.Date
+  dau                      Int      @default(0)
+  wau                      Int      @default(0)
+  mau                      Int      @default(0)
+  totalRegistrations       Int      @default(0)
+  totalWorkoutsCompleted   Int      @default(0)
+  totalWorkoutMinutes      Float    @default(0)
+  totalMealsLogged         Int      @default(0)
+  totalActiveSubscriptions Int      @default(0)
+  grossRevenueCents        Float    @default(0)
+  netRevenueCents          Float    @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([date])
+  @@map("daily_system_metrics")
+}
+
+model CohortRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  cohortKey      String   @unique
+  dimension      String
+  dimensionValue String
+  startDate      DateTime @db.Date
+  initialSize    Int      @default(0)
+  day1Retained   Int      @default(0)
+  day7Retained   Int      @default(0)
+  day14Retained  Int      @default(0)
+  day30Retained  Int      @default(0)
+  day60Retained  Int      @default(0)
+  day90Retained  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([dimension, startDate])
+  @@map("cohort_records")
+}
+
+model ReportDefinition {
+  id            String            @id @default(uuid()) @db.Uuid
+  name          String
+  description   String?
+  category      String
+  queryTemplate String
+  version       Int               @default(1)
+  createdBy     String            @db.Uuid
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  executions    ReportExecution[]
+
+  @@map("report_definitions")
+}
+
+model ReportExecution {
+  id              String           @id @default(uuid()) @db.Uuid
+  reportId        String           @db.Uuid
+  report          ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  executedBy      String           @db.Uuid
+  status          String           @default("PENDING")
+  parameters      Json?
+  result          Json?
+  executionTimeMs Int?
+  createdAt       DateTime         @default(now())
+
+  @@index([reportId])
+  @@index([executedBy])
+  @@map("report_executions")
+}
+
+model AnalyticsExport {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exportType  String    @default("CSV")
+  status      String    @default("PENDING")
+  fileKey     String?
+  downloadUrl String?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("analytics_exports")
+}
+
+// ==========================================
+// STAGE 16 — MULTI-TENANCY, TEAMS & ORGANIZATIONS
+// ==========================================
+
+enum OrganizationType {
+  PERSONAL
+  GYM
+  FITNESS_STUDIO
+  TRAINING_BUSINESS
+  CORPORATE
+  SPORTS_TEAM
+  ENTERPRISE
+  OTHER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+  DELETED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MANAGER
+  TRAINER
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum DomainVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+model Organization {
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String             @unique
+  description String?
+  logoUrl     String?
+  type        OrganizationType   @default(PERSONAL)
+  status      OrganizationStatus @default(ACTIVE)
+  ownerId     String             @db.Uuid
+  owner       User               @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  planId      String?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+
+  memberships OrganizationMembership[]
+  invitations OrganizationInvitation[]
+  teams       Team[]
+  settings    OrganizationSettings?
+  domains     OrganizationDomain[]
+  auditLogs   AuditLog[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([ownerId])
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String           @db.Uuid
+  user           User             @relation("UserOrganizationMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  role           OrganizationRole @default(MEMBER)
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now())
+  invitedBy      String?          @db.Uuid
+  inviter        User?            @relation("InvitedMemberships", fields: [invitedBy], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId, status])
+  @@index([role])
+  @@map("organization_memberships")
+}
+
+model OrganizationInvitation {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           OrganizationRole @default(MEMBER)
+  teamId         String?          @db.Uuid
+  team           Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  tokenHash      String           @unique
+  inviterId      String           @db.Uuid
+  inviter        User             @relation("SentInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([organizationId, status])
+  @@index([email])
+  @@index([tokenHash])
+  @@map("organization_invitations")
+}
+
+model Team {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  description    String?
+  status         String       @default("ACTIVE")
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  memberships TeamMembership[]
+  invitations OrganizationInvitation[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("teams")
+}
+
+model TeamMembership {
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @db.Uuid
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("MEMBER")
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("team_memberships")
+}
+
+model OrganizationSettings {
+  id                   String       @id @default(uuid()) @db.Uuid
+  organizationId       String       @unique @db.Uuid
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  timezone             String       @default("UTC")
+  locale               String       @default("en-US")
+  defaultUnits         String       @default("metric")
+  branding             Json?
+  privacy              Json?
+  memberVisibility     String       @default("ORGANIZATION")
+  contentPolicies      Json?
+  notificationDefaults Json?
+  workoutDefaults      Json?
+  nutritionDefaults    Json?
+  securityPolicies     Json?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@map("organization_settings")
+}
+
+model OrganizationDomain {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  organizationId     String                   @db.Uuid
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  domain             String                   @unique
+  verificationStatus DomainVerificationStatus @default(PENDING)
+  verificationToken  String
+  verifiedAt         DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([organizationId])
+  @@index([domain])
+  @@map("organization_domains")
+}
+
+model AuditLog {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String?       @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actorUserId    String        @db.Uuid
+  actor          User          @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  action         String
+  resource       String
+  resourceId     String?
+  details        Json?
+  ipAddress      String?
+  userAgent      String?
+  requestId      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+
 
