@@ -6,6 +6,9 @@ export interface BackgroundJob<T = any> {
   id: string;
   name: string;
   payload: T;
+  organizationId?: string;
+  userId?: string;
+  requestId?: string;
   retries: number;
   maxRetries: number;
   backoffMs: number;
@@ -15,19 +18,27 @@ export class BackgroundQueueService {
   private queue: BackgroundJob[] = [];
   private isProcessing = false;
 
-  public enqueueJob<T>(name: string, payload: T, maxRetries = 3): string {
+  public enqueueJob<T>(
+    name: string,
+    payload: T,
+    maxRetries = 3,
+    context?: { organizationId?: string; userId?: string; requestId?: string },
+  ): string {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const job: BackgroundJob<T> = {
       id: jobId,
       name,
       payload,
+      organizationId: context?.organizationId,
+      userId: context?.userId,
+      requestId: context?.requestId,
       retries: 0,
       maxRetries,
       backoffMs: 1000,
     };
 
     this.queue.push(job);
-    logger.info({ jobId, name }, 'Enqueued background job');
+    logger.info({ jobId, name, organizationId: context?.organizationId }, 'Enqueued background job');
 
     this.processQueue().catch((err) => {
       logger.error({ err }, 'Error processing background queue');
@@ -72,6 +83,21 @@ export class BackgroundQueueService {
           case 'MEDIA_CLEANUP': {
             const { mediaQueueService } = await import('../modules/media/jobs/media-queue.service');
             await mediaQueueService.runOrphanCleanup();
+            break;
+          }
+          case 'ANALYTICS_EVENT_PROCESSING': {
+            const { analyticsQueueService } = await import('../modules/analytics/jobs/analytics-queue.service');
+            await analyticsQueueService.processEventJob(job.payload);
+            break;
+          }
+          case 'ANALYTICS_DAILY_AGGREGATION': {
+            const { analyticsQueueService } = await import('../modules/analytics/jobs/analytics-queue.service');
+            await analyticsQueueService.runDailyAggregationJob();
+            break;
+          }
+          case 'ANALYTICS_EXPORT': {
+            const { analyticsQueueService } = await import('../modules/analytics/jobs/analytics-queue.service');
+            await analyticsQueueService.processExportJob(job.payload);
             break;
           }
           default:
