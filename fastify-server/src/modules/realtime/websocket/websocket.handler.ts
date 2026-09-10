@@ -116,6 +116,25 @@ export async function registerWebSocketHandler(fastify: FastifyInstance): Promis
               isAllowed = true; // Authorized workout participant
             } else if (channel.startsWith('trainer:') && (userRole === 'TRAINER' || userRole === 'ADMIN')) {
               isAllowed = true;
+            } else if (channel.startsWith('org:')) {
+              const parts = channel.split(':');
+              const orgId = parts[1];
+              if (orgId) {
+                const { membershipRepository } = await import('../../organizations/repositories/membership.repository');
+                const m = await membershipRepository.findByOrgAndUser(orgId, userId);
+                if (m && m.status === 'ACTIVE') {
+                  if (parts.length > 2 && parts[2] === 'team' && parts[3]) {
+                    const teamId = parts[3];
+                    const { teamRepository } = await import('../../organizations/repositories/team.repository');
+                    const teamMembers = await teamRepository.findTeamMemberships(teamId);
+                    if (teamMembers.some((tm) => tm.userId === userId)) {
+                      isAllowed = true;
+                    }
+                  } else {
+                    isAllowed = true;
+                  }
+                }
+              }
             }
 
             if (isAllowed) {
