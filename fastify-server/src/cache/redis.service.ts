@@ -32,6 +32,53 @@ export class RedisService {
     return RedisService.instance;
   }
 
+  public async get(key: string): Promise<string | null> {
+    return this.client.get(key);
+  }
+
+  public async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (ttlSeconds) {
+      await this.client.set(key, value, 'EX', ttlSeconds);
+    } else {
+      await this.client.set(key, value);
+    }
+  }
+
+  public async del(key: string): Promise<void> {
+    await this.client.del(key);
+  }
+
+  public buildTenantKey(organizationId: string, key: string): string {
+    return `org:${organizationId}:${key}`;
+  }
+
+  public async getTenantCache<T>(organizationId: string, key: string): Promise<T | null> {
+    const tenantKey = this.buildTenantKey(organizationId, key);
+    const data = await this.client.get(tenantKey);
+    if (!data) return null;
+    try {
+      return JSON.parse(data) as T;
+    } catch {
+      return data as any as T;
+    }
+  }
+
+  public async setTenantCache<T>(
+    organizationId: string,
+    key: string,
+    value: T,
+    ttlSeconds = 3600,
+  ): Promise<void> {
+    const tenantKey = this.buildTenantKey(organizationId, key);
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    await this.client.set(tenantKey, serialized, 'EX', ttlSeconds);
+  }
+
+  public async deleteTenantCache(organizationId: string, key: string): Promise<void> {
+    const tenantKey = this.buildTenantKey(organizationId, key);
+    await this.client.del(tenantKey);
+  }
+
   public async isHealthy(): Promise<boolean> {
     try {
       const res = await this.client.ping();
@@ -53,3 +100,4 @@ export class RedisService {
 }
 
 export const redisService = RedisService.getInstance();
+
