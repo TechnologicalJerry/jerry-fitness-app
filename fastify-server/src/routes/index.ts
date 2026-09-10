@@ -14,6 +14,8 @@ import { realtimeRoutes } from '../modules/realtime/routes/realtime.routes';
 import { registerWebSocketHandler } from '../modules/realtime/websocket/websocket.handler';
 import { searchRoutes } from '../modules/search/routes/search.routes';
 import { mediaRoutes } from '../modules/media/routes/media.routes';
+import { analyticsRoutes } from '../modules/analytics/routes/analytics.routes';
+import { organizationRoutes } from '../modules/organizations/routes/organization.routes';
 
 export async function appRoutes(fastify: FastifyInstance): Promise<void> {
   // Top-level health endpoints for orchestration/load balancers
@@ -36,6 +38,8 @@ export async function appRoutes(fastify: FastifyInstance): Promise<void> {
       await v1.register(realtimeRoutes);
       await v1.register(searchRoutes);
       await v1.register(mediaRoutes);
+      await v1.register(analyticsRoutes);
+      await v1.register(organizationRoutes);
       await v1.register(registerWebSocketHandler);
     },
     { prefix: '/api/v1' },
