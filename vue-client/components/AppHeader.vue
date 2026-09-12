@@ -23,6 +23,24 @@
         <NuxtLink v-if="isAuthenticated" to="/dashboard" class="nav-link" active-class="active">
           Dashboard
         </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/daily-plan" class="nav-link" active-class="active">
+          Daily Plan
+        </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/training-recovery" class="nav-link" active-class="active">
+          Training & Recovery
+        </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/goals" class="nav-link" active-class="active">
+          Goals
+        </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/analytics" class="nav-link" active-class="active">
+          Analytics
+        </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/search" class="nav-link" active-class="active">
+          Exercise Library
+        </NuxtLink>
+        <NuxtLink v-if="isAuthenticated" to="/profile" class="nav-link" active-class="active">
+          Profile
+        </NuxtLink>
       </nav>
 
       <!-- Auth Actions -->
